@@ -1,4 +1,4 @@
-const Discord = require("discord.js");
+const {Client, GatewayIntentBits, Events, Partials, AttachmentBuilder} = require("discord.js");
 const puppeteer = require('puppeteer');
 const SimpleNodeLogger = require('simple-node-logger')
 
@@ -17,10 +17,17 @@ errorLog.setLevel('error');
 
 var client;
 function setup() {
-	client = new Discord.Client({
+	client = new Client({
 		disableEveryone: true,
 		disabledEvents: ["TYPING_START"],
-		autoReconnect: true
+		autoReconnect: true,
+		intents: [
+			GatewayIntentBits.DirectMessages,
+			GatewayIntentBits.GuildMessages,
+			GatewayIntentBits.MessageContent,
+			GatewayIntentBits.Guilds
+		  ],
+		partials: [Partials.Channel],
 	});
 
 	client.login(config.token).then(() => {
@@ -31,11 +38,13 @@ function setup() {
 		console.log(`Ready as ${client.user.username}`);
 	});
 
-	client.on("message", (message) => {
+	client.on(Events.MessageCreate, async message => {
+		console.log('msg found', message.content)
 		if (message.author.bot) return;
-		let matches = wikiRegex.exec(message.cleanContent);
+		let matches = wikiRegex.exec(message.content);
 		while (matches) {
-			match = matches[1];
+			console.log('regex matches found')
+			var match = matches[1];
 			if (match == undefined)
 				match = matches[2];
 			let target
@@ -45,12 +54,14 @@ function setup() {
 				target = titleCase(match);
 
 			handleItem(target, message);
-			matches = wikiRegex.exec(message.cleanContent);
+			matches = wikiRegex.exec(message.content);
 		}
 	});
 
 	client.on("error", (error) => {
+		console.log(error);
 		errorLog.log(error);
+		
 	});
 };
 
@@ -80,7 +91,7 @@ async function handleItem(itemName, message) {
 		if (!result.success) {
 			editMessage(channel, messageId, `Could not get details from the Wiki for **${itemName}**`);
 			setTimeout(function () {
-				channel.fetchMessage(messageId).then(message => {
+				channel.messages.fetch(messageId).then(message => {
 					message.delete();
 				}).catch(() => {
 					errorLog.error(`"Could not delete message ${messageId}" "${guildName}" "${outputString}"`);
@@ -99,20 +110,24 @@ async function handleItem(itemName, message) {
 
 		//if no screenshot, just edit the original message
 		if (!result.screenshot) {
+			console.log('no screenshot found: ',result.screenshot)
 			editMessage(channel, messageId, outputString);
 			return;
 		}
 
 		//otherwise delete the message and create a new one with the screenshot
-		channel.fetchMessage(messageId).then(message => {
+		channel.messages.fetch(messageId).then(message => {
 			message.delete();
 		}).catch(() => {
 			errorLog.error(`"Could not delete message ${messageId}" "${guildName}" "${outputString}"`);
 		});
-		channel.send(outputString, { file: result.screenshot });
+		console.log('screenshot:',result.screenshot)
+		const attachment = new AttachmentBuilder(result.screenshot)
+		channel.send({ content: outputString, files: [attachment] });
 	}).catch((reason) => {
+		console.log(reason)
 		errorLog.error(`"GetImage Failed" "${guildName}" "${reason}"`);
-		channel.fetchMessage(messageId).then(message => {
+		channel.messages.fetch(messageId).then(message => {
 			message.delete();
 		}).catch(() => {
 			errorLog.error(`"Could not delete message ${messageId}" "${guildName}" "${outputString}"`);
@@ -121,7 +136,7 @@ async function handleItem(itemName, message) {
 }
 
 function editMessage(channel, messageId, content) {
-	channel.fetchMessage(messageId).then(message => {
+	channel.messages.fetch(messageId).then(message => {
 		message.edit(content);
 	}).catch(() => {
 		errorLog.error(`"Could not edit message ${messageId}" "${channel.guild.name}" "${content}"`);
@@ -172,7 +187,9 @@ async function getImage(url, guildName) {
 		if (!element)
 			return;
 
-		let screenshot = await element.screenshot();
+		let screenshot = await element.screenshot({
+			path: 'screenshots/test.png',
+		});
 		await page.close();
 		await browser.close();
 		return screenshot;

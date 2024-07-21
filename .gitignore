@@ -2,3 +2,4 @@ node_modules/
 logs/*.log
 config.json
 .vscode/
+screenshots/*.png
