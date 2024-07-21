@@ -39,11 +39,9 @@ function setup() {
 	});
 
 	client.on(Events.MessageCreate, async message => {
-		console.log('msg found', message.content)
 		if (message.author.bot) return;
 		let matches = wikiRegex.exec(message.content);
 		while (matches) {
-			console.log('regex matches found')
 			var match = matches[1];
 			if (match == undefined)
 				match = matches[2];
@@ -59,7 +57,6 @@ function setup() {
 	});
 
 	client.on("error", (error) => {
-		console.log(error);
 		errorLog.log(error);
 		
 	});
@@ -110,7 +107,6 @@ async function handleItem(itemName, message) {
 
 		//if no screenshot, just edit the original message
 		if (!result.screenshot) {
-			console.log('no screenshot found: ',result.screenshot)
 			editMessage(channel, messageId, outputString);
 			return;
 		}
@@ -121,11 +117,9 @@ async function handleItem(itemName, message) {
 		}).catch(() => {
 			errorLog.error(`"Could not delete message ${messageId}" "${guildName}" "${outputString}"`);
 		});
-		console.log('screenshot:',result.screenshot)
 		const attachment = new AttachmentBuilder(result.screenshot)
 		channel.send({ content: outputString, files: [attachment] });
 	}).catch((reason) => {
-		console.log(reason)
 		errorLog.error(`"GetImage Failed" "${guildName}" "${reason}"`);
 		channel.messages.fetch(messageId).then(message => {
 			message.delete();
